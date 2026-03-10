@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp AI Bot</title>
+    <!-- Modern Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #25D366;
+            --primary-dark: #128C7E;
+            --bg-dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text-light: #f8fafc;
+            --text-muted: #94a3b8;
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --status-connected: #10b981;
+            --status-disconnected: #ef4444;
+            --status-connecting: #f59e0b;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            background: radial-gradient(circle at top right, #1e293b, var(--bg-dark));
+            color: var(--text-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Ambient background glow */
+        body::before {
+            content: '';
+            position: absolute;
+            top: -20%;
+            left: -10%;
+            width: 50vw;
+            height: 50vw;
+            background: radial-gradient(circle, rgba(37, 211, 102, 0.15) 0%, transparent 70%);
+            border-radius: 50%;
+            z-index: 0;
+        }
+
+        body::after {
+            content: '';
+            position: absolute;
+            bottom: -20%;
+            right: -10%;
+            width: 40vw;
+            height: 40vw;
+            background: radial-gradient(circle, rgba(14, 165, 233, 0.1) 0%, transparent 70%);
+            border-radius: 50%;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 900px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+            padding: 2rem;
+        }
+
+        @media (min-width: 768px) {
+            .container {
+                grid-template-columns: 400px 1fr;
+            }
+        }
+
+        /* Glassmorphism Panel */
+        .panel {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 2.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            background: linear-gradient(135deg, #25D366, #3b82f6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 2.2rem;
+            margin: 0 0 0.5rem 0;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin: 0;
+            font-weight: 400;
+        }
+
+        /* QR Container styling */
+        .qr-wrapper {
+            background: white;
+            padding: 1rem;
+            border-radius: 16px;
+            width: 280px;
+            height: 280px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            transition: all 0.5s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .qr-wrapper::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            background: linear-gradient(45deg, var(--primary), #3b82f6, var(--primary));
+            z-index: -1;
+            border-radius: 18px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .qr-wrapper:hover::before {
+            opacity: 1;
+        }
+
+        .qr-skeleton {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #e2e8f0;
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Status Badge */
+        .status-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0.5rem 1.2rem;
+            border-radius: 999px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s ease;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        .status-badge.disconnected {
+            color: var(--status-disconnected);
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .status-badge.connecting {
+            color: var(--status-connecting);
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+
+        .status-badge.connected {
+            color: var(--status-connected);
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        /* Action Buttons */
+        .action-button {
+            margin-top: 1.5rem;
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 8px;
+            padding: 0.75rem 1.5rem;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 100%;
+            display: none;
+            /* hidden by default */
+        }
+
+        .action-button:hover {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.5);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+        }
+
+        /* Terminal Logs Panel */
+        .logs-panel {
+            background: #0f172a;
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) ease-out;
+        }
+
+        .logs-header {
+            padding: 1rem 1.5rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid var(--glass-border);
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .window-controls {
+            display: flex;
+            gap: 6px;
+            margin-right: 10px;
+        }
+
+        .control {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .close {
+            background: #ff5f56;
+        }
+
+        .min {
+            background: #ffbd2e;
+        }
+
+        .max {
+            background: #27c93f;
+        }
+
+        .logs-content {
+            padding: 1.5rem;
+            height: 100%;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #a8b2d1;
+        }
+
+        .logs-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .logs-content::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .logs-content::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        .logs-content::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .log-entry {
+            margin: 0 0 6px 0;
+            word-break: break-all;
+            opacity: 0;
+            animation: fadeIn 0.3s forwards;
+        }
+
+        .log-time {
+            color: #64748b;
+            margin-right: 8px;
+            user-select: none;
+        }
+
+        .log-info {
+            color: #38bdf8;
+        }
+
+        .log-success {
+            color: #34d399;
+        }
+
+        .log-error {
+            color: #f87171;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        .success-mark {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--status-connected);
+        }
+
+        .success-icon {
+            font-size: 5rem;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+            animation: scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+                opacity: 0;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <!-- Control Panel -->
+        <div class="panel">
+            <div class="header">
+                <h1>WhatsApp AI Bot</h1>
+                <p class="subtitle">Gemini Flash Integration Engine</p>
+            </div>
+
+            <div class="qr-wrapper" id="qr-container">
+                <div class="qr-skeleton" id="qr-message">
+                    <div class="spinner"></div>
+                    <span>Initializing Engine...</span>
+                </div>
+            </div>
+
+            <div class="status-container">
+                <div id="statusBadge" class="status-badge disconnected">
+                    <div class="status-dot"></div>
+                    <span id="statusText">Disconnected</span>
+                </div>
+            </div>
+
+            <button id="reconfigureBtn" class="action-button">
+                Stop & Reconfigure Bot
+            </button>
+        </div>
+
+        <!-- Logs Panel -->
+        <div class="logs-panel">
+            <div class="logs-header">
+                <div class="window-controls">
+                    <div class="control close"></div>
+                    <div class="control min"></div>
+                    <div class="control max"></div>
+                </div>
+                system_events_stream
+            </div>
+            <div class="logs-content" id="logs">
+                <!-- Logs injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Socket and QR logic -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script>
+        const socket = io();
+        const qrContainer = document.getElementById('qr-container');
+        const statusBadge = document.getElementById('statusBadge');
+        const statusText = document.getElementById('statusText');
+        const logsDiv = document.getElementById('logs');
+        const reconfigureBtn = document.getElementById('reconfigureBtn');
+
+        reconfigureBtn.addEventListener('click', () => {
+            if (confirm("Are you sure you want to stop the bot and wipe the current WhatsApp session?")) {
+                reconfigureBtn.disabled = true;
+                reconfigureBtn.textContent = "Stopping...";
+                socket.emit("wipe_session");
+            }
+        });
+
+        function getTime() {
+            const now = new Date();
+            return `[${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}]`;
+        }
+
+        function addLog(msg, type = "info") {
+            const p = document.createElement('div');
+            p.className = `log-entry log-${type}`;
+            p.innerHTML = `<span class="log-time">${getTime()}</span><span>${msg}</span>`;
+            logsDiv.appendChild(p);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        socket.on('connect', () => {
+            addLog("Established connection with bot server", "success");
+        });
+
+        socket.on('disconnect', () => {
+            addLog("Lost connection to bot server. Retrying...", "error");
+            updateStatus('disconnected', 'Server Offline');
+        });
+
+        socket.on('qr', (qrData) => {
+            addLog('New cryptographic payload received for authentication', 'info');
+            // Use quickchart.io for reliable QR code generation
+            const qrImageUrl = `https://quickchart.io/qr?text=${encodeURIComponent(qrData)}&size=250&margin=2&dark=0f172a&light=ffffff`;
+            qrContainer.innerHTML = `<img src="${qrImageUrl}" alt="WhatsApp QR Code" style="width: 250px; height: 250px; border-radius: 8px;">`;
+
+            addLog('Authentication QR prepared for scan', 'info');
+            updateStatus('connecting', 'Awaiting Device Sync...');
+        });
+
+        socket.on('status', (status) => {
+            if (status === 'connected') {
+                updateStatus('connected', 'System Online');
+                qrContainer.innerHTML = `
+                    <div class="success-mark">
+                        <div class="success-icon">✓</div>
+                        <div style="color:#0f172a; font-weight:600; font-size:1.1rem; text-align:center;">
+                            Authentication Verified<br>
+                            <span style="font-size:0.85rem; font-weight:400; color:#64748b; margin-top:4px; display:block;">Bot is actively listening</span>
+                        </div>
+                    </div>`;
+                reconfigureBtn.style.display = 'block';
+                reconfigureBtn.disabled = false;
+                reconfigureBtn.textContent = "Stop & Reconfigure Bot";
+            } else if (status === 'disconnected') {
+                updateStatus('disconnected', 'Disconnected');
+                reconfigureBtn.style.display = 'none';
+                qrContainer.innerHTML = `
+                    <div class="qr-skeleton" id="qr-message">
+                        <div class="spinner"></div>
+                        <span>Awaiting payload...</span>
+                    </div>`;
+            }
+        });
+
+        socket.on('log', (msg) => {
+            let type = "info";
+            if (msg.toLowerCase().includes('failed') || msg.toLowerCase().includes('error')) type = "error";
+            if (msg.toLowerCase().includes('replied') || msg.toLowerCase().includes('connected to whatsapp')) type = "success";
+            addLog(msg, type);
+        });
+
+        function updateStatus(className, text) {
+            statusBadge.className = `status-badge ${className}`;
+            statusText.textContent = text;
+        }
+    </script>
+</body>
+
+</html>

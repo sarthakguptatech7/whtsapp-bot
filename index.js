@@ -1,46 +1,57 @@
 require("dotenv").config();
 const express = require("express");
-const webhookRouter = require("./src/webhook");
-const REQUIRED_ENV = [
-  "WA_ACCESS_TOKEN",
-  "WA_PHONE_NUMBER_ID",
-  "WA_VERIFY_TOKEN",
-  "GEMINI_API_KEY",
-];
-const missing = REQUIRED_ENV.filter((key) => !process.env[key]);
-if (missing.length > 0) {
-  console.error("❌ Missing required environment variables:");
-  missing.forEach((key) => console.error(`   - ${key}`));
-  console.error("\nCopy .env.example → .env and fill in your keys.");
+const http = require("http");
+const { Server } = require("socket.io");
+const { startBot, wipeSession } = require("./bot");
+const path = require("path");
+
+if (!process.env.GEMINI_API_KEY) {
+  console.error("❌ Missing required environment variable: GEMINI_API_KEY");
+  console.error("Please add it to your .env file.");
   process.exit(1);
 }
+
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
 const PORT = process.env.PORT || 3000;
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+app.use(express.static(path.join(__dirname, "public")));
+
 app.get("/", (req, res) => {
-  res.json({
-    status: "🟢 running",
-    bot: "WhatsApp × Gemini Flash",
-    webhook: `POST /webhook`,
-    uptime: `${Math.floor(process.uptime())}s`,
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+let currentStatus = "disconnected";
+let currentQR = null;
+
+io.on("connection", (socket) => {
+  console.log("[Server] Web client connected");
+
+  socket.emit("status", currentStatus);
+  if (currentQR && currentStatus !== "connected") {
+    socket.emit("qr", currentQR);
+  }
+
+  socket.on("disconnect", () => {
+    console.log("[Server] Web client disconnected");
+  });
+
+  socket.on("wipe_session", async () => {
+    console.log("[Server] Received wipe_session command from UI.");
+    io.emit("log", "Command received: Terminating and wiping WhatsApp session...");
+    await wipeSession();
   });
 });
-app.use("/webhook", webhookRouter);
-app.use((req, res) => {
-  res.status(404).json({ error: "Not found" });
+
+startBot(io, (status) => currentStatus = status, (qr) => currentQR = qr);
+
+server.listen(PORT, () => {
+  console.log(`\n🚀 WhatsApp × Gemini Bot (Baileys) running on port ${PORT}`);
+  console.log(`   Dashboard: http://localhost:${PORT}`);
+  console.log(`\nOpen the dashboard to scan the QR code and connect.\n`);
 });
-app.use((err, req, res, next) => {
-  console.error("[Server] Unhandled error:", err.message);
-  res.status(500).json({ error: "Internal server error" });
-});
-app.listen(PORT, () => {
-  console.log(`\n🚀 WhatsApp × Gemini bot running on port ${PORT}`);
-  console.log(`   Health:  http:
-  console.log(`   Webhook: http:
-  console.log(`\n   Expose publicly with: ngrok http ${PORT}`);
-  console.log(`   Then set webhook URL in Meta dashboard.\n`);
-});
+
 process.on("SIGTERM", () => {
   console.log("\n[Server] SIGTERM received — shutting down gracefully");
   process.exit(0);
