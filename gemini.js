@@ -1,7 +1,7 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const conversationHistory = new Map();
-const MAX_HISTORY = 10; 
+const MAX_HISTORY = 10;
 const SYSTEM_PROMPT = `You are a warm, witty, and thoughtful assistant responding over WhatsApp.
 Personality & Tone:
 - You write like a real person texting — casual, natural, a little playful
@@ -29,7 +29,7 @@ function getHistory(userId) {
 }
 function trimHistory(history) {
   while (history.length > MAX_HISTORY * 2) {
-    history.splice(0, 2); 
+    history.splice(0, 2);
   }
 }
 function enrichPrompt(message) {
@@ -41,7 +41,7 @@ function enrichPrompt(message) {
     return `${message}\n[note: greeting message, reply warmly and briefly, maybe ask what's up]`;
   }
   if (lower.includes("?")) {
-    return message; 
+    return message;
   }
   if (lower.includes("help") || lower.includes("how do i") || lower.includes("how to")) {
     return `${message}\n[note: help request, be practical and clear but still casual]`;
@@ -50,13 +50,13 @@ function enrichPrompt(message) {
 }
 async function generateSmartReply(userId, userMessage) {
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: "gemini-2.5-flash",
     systemInstruction: SYSTEM_PROMPT,
     generationConfig: {
-      temperature: 0.85,       
+      temperature: 0.85,
       topP: 0.92,
       topK: 40,
-      maxOutputTokens: 300,    
+      maxOutputTokens: 300,
       candidateCount: 1,
     },
   });
