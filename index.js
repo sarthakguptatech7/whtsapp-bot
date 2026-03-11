@@ -46,7 +46,7 @@ io.on("connection", (socket) => {
 
 startBot(io, (status) => currentStatus = status, (qr) => currentQR = qr);
 
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`\n🚀 WhatsApp × Gemini Bot (Baileys) running on port ${PORT}`);
   console.log(`   Dashboard: http://localhost:${PORT}`);
   console.log(`\nOpen the dashboard to scan the QR code and connect.\n`);
