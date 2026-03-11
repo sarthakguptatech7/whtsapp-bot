@@ -5,10 +5,10 @@ const { Server } = require("socket.io");
 const { startBot, wipeSession } = require("./bot");
 const path = require("path");
 
+let apiWarning = "";
 if (!process.env.GEMINI_API_KEY) {
-  console.error("❌ Missing required environment variable: GEMINI_API_KEY");
-  console.error("Please add it to your .env file.");
-  process.exit(1);
+  apiWarning = "❌ Missing required environment variable: GEMINI_API_KEY. AI responses will fail.";
+  console.error(apiWarning);
 }
 
 const app = express();
@@ -29,6 +29,10 @@ io.on("connection", (socket) => {
   console.log("[Server] Web client connected");
 
   socket.emit("status", currentStatus);
+  if (apiWarning) {
+    socket.emit("log", apiWarning);
+  }
+
   if (currentQR && currentStatus !== "connected") {
     socket.emit("qr", currentQR);
   }
