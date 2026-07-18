@@ -1,0 +1,64 @@
+name: Verify AIstore Reports Deployment
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "aistore-reports/**"
+      - ".github/workflows/verify-aistore-reports.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: aistore-reports-deployment
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - id: smoke
+        name: Wait for DigitalOcean and verify image-alert route
+        shell: bash
+        run: |
+          set -u
+          service_url="https://aistore-whatsapp-reports-azjzk.ondigitalocean.app"
+          for attempt in $(seq 1 24); do
+            health=$(curl --silent --show-error --max-time 15 "$service_url/health" 2>/dev/null || true)
+            body=$(mktemp)
+            status=$(curl --silent --show-error --max-time 15 -o "$body" -w '%{http_code}' \
+              -X POST "$service_url/api/alerts/send" \
+              -H 'Content-Type: application/json' \
+              -d '{}' 2>/dev/null || true)
+            if grep -q '"service":"aistore-whatsapp-reports"' <<< "$health" \
+              && [ "$status" = "400" ] \
+              && grep -q '"error"' "$body"; then
+              echo "health=$health" >> "$GITHUB_OUTPUT"
+              echo "alert_status=$status" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "DigitalOcean did not expose the image-alert route in time" >&2
+          exit 1
+      - name: Publish CLI-readable deployment status
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          HEALTH: ${{ steps.smoke.outputs.health }}
+          ALERT_STATUS: ${{ steps.smoke.outputs.alert_status }}
+        run: |
+          status_json=$(jq -nc \
+            --arg sha "$GITHUB_SHA" \
+            --arg status "$JOB_STATUS" \
+            --arg health "$HEALTH" \
+            --arg alertStatus "$ALERT_STATUS" \
+            '{sha:$sha,status:$status,health:$health,alertStatus:$alertStatus}')
+          blob=$(printf '%s\n' "$status_json" | git hash-object -w --stdin)
+          tree=$(printf '100644 blob %s\tstatus.json\n' "$blob" | git mktree)
+          commit=$(printf 'AIstore reports deployment: %s\n' "$JOB_STATUS" | \
+            git -c user.name=github-actions -c user.email=github-actions@github.com commit-tree "$tree")
+          git push --force origin "$commit:refs/heads/deploy-status/aistore-reports"
