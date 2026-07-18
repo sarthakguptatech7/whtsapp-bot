@@ -68,6 +68,13 @@ class WhatsAppSession {
     await this.socket.sendMessage(jid, { document: pdfBuffer, mimetype: 'application/pdf', fileName, caption });
     return { recipient: phoneNumber, sentAt: new Date().toISOString() };
   }
+
+  async sendImage(phoneNumber, imageBuffer, mimetype, caption) {
+    if (this.status !== 'connected' || !this.socket) throw new Error('Admin WhatsApp is not paired');
+    const jid = this.normalizeRecipient(phoneNumber);
+    await this.socket.sendMessage(jid, { image: imageBuffer, mimetype, caption });
+    return { recipient: phoneNumber, sentAt: new Date().toISOString() };
+  }
 }
 
 module.exports = { WhatsAppSession };

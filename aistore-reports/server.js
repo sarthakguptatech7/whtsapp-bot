@@ -46,6 +46,14 @@ function reportFileName(report) {
   return `aistore-${store || 'store'}-${new Date().toISOString().slice(0, 10)}.pdf`;
 }
 
+function decodeEvidenceImage(value) {
+  const match = /^data:(image\/(?:jpeg|png));base64,([A-Za-z0-9+/=]+)$/.exec(String(value || ''));
+  if (!match) throw new Error('A JPEG or PNG evidence image is required');
+  const buffer = Buffer.from(match[2], 'base64');
+  if (!buffer.length || buffer.length > 1_500_000) throw new Error('Evidence image must be smaller than 1.5 MB');
+  return { buffer, mimetype: match[1] };
+}
+
 async function deliver({ ownerPhone, ownerName, report, source = 'manual', scheduleId = null }) {
   ownerPhone = ownerPhone || defaultOwnerPhone;
   if (!validPhone(ownerPhone)) throw new Error('A valid owner number with country code is required');
@@ -77,6 +85,37 @@ app.post('/api/reports/preview', async (request, response, next) => {
 
 app.post('/api/reports/send', async (request, response, next) => {
   try { response.status(201).json(await deliver(request.body || {})); } catch (error) { next(error); }
+});
+
+app.post('/api/alerts/send', async (request, response, next) => {
+  try {
+    const { ownerPhone = defaultOwnerPhone, storeName = 'AMPM', cameraId = 'camera', alertId, detectedAt, confidence, imageDataUrl, audit } = request.body || {};
+    if (!validPhone(ownerPhone)) throw new Error('A valid owner number with country code is required');
+    if (!alertId) throw new Error('An alert ID is required');
+    const existing = history.find((item) => item.id === alertId && item.source === 'vision-security-alert');
+    if (existing) return response.status(200).json(existing);
+    const image = decodeEvidenceImage(imageDataUrl);
+    const detected = new Date(detectedAt || Date.now());
+    const result = await session.sendImage(
+      ownerPhone,
+      image.buffer,
+      image.mimetype,
+      `🚨 AIstore security alert\nSuspected theft activity at ${storeName}.\nCamera: ${cameraId}\nTime: ${Number.isNaN(detected.getTime()) ? new Date().toLocaleString('en-IN') : detected.toLocaleString('en-IN')}\nConfidence: ${Math.round(Number(confidence || 0) * 100)}%\n\nPre-event evidence attached. Please review immediately.`,
+    );
+    const record = {
+      id: alertId,
+      source: 'vision-security-alert',
+      ownerPhone,
+      storeName,
+      cameraId,
+      status: 'sent',
+      audit: audit || null,
+      ...result,
+    };
+    history = [record, ...history].slice(0, 100);
+    writeJson(historyPath, history);
+    return response.status(201).json(record);
+  } catch (error) { return next(error); }
 });
 
 app.post('/api/schedules', (request, response) => {

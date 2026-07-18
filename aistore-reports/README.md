@@ -17,6 +17,7 @@ The paired WhatsApp session is stored in `.whatsapp-session/`; schedules and del
 - `GET /api/whatsapp/status` — pairing state and QR image
 - `POST /api/reports/preview` — download a generated PDF
 - `POST /api/reports/send` — explicitly send the PDF to one owner
+- `POST /api/alerts/send` — immediately send a security evidence image to one owner
 - `GET|POST /api/schedules` — list or create owner schedules
 - `DELETE /api/schedules/:id` — remove a schedule
 - `GET /api/reports/history` — recent real deliveries
