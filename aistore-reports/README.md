@@ -22,4 +22,6 @@ The paired WhatsApp session is stored in `.whatsapp-session/`; schedules and del
 - `DELETE /api/schedules/:id` — remove a schedule
 - `GET /api/reports/history` — recent real deliveries
 
+Security alerts may omit the recipient from the browser request; the service uses its server-side `DEFAULT_OWNER_PHONE_NUMBER`. This keeps the owner number out of the public dashboard bundle while preserving immediate evidence delivery.
+
 Baileys connects through WhatsApp Web and is not the official WhatsApp Business Cloud API. For a long-lived production rollout, use a dedicated business number, obtain recipient consent, and evaluate migration to the official API.
